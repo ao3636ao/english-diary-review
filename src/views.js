@@ -3,7 +3,9 @@ import {
   emptyProgress,
   isWeak,
   summarize,
-  selectQuestions,
+  selectReviewItems,
+  sortDiarySentences,
+  isDiary,
   jstDate,
   same,
 } from "./core.js";
@@ -82,6 +84,7 @@ export function home(state) {
       p.last_reviewed_at && jstDate(new Date(p.last_reviewed_at)) === jstDate(),
   ).length;
   return `<section class="hero"><div><p class="eyebrow">YOUR DAILY ENGLISH NOTE</p><h1>今日のことばを、<br>明日の自分へ。</h1><p>日本語を見て、英語でひとこと。<br>小さな復習を、毎日の習慣に。</p><button class="button light" data-action="start-study">今日の学習をはじめる <span aria-hidden="true">→</span></button><small>${today ? `今日は${today}件の表現を復習しました` : "1文から、自分のペースで。"}</small></div><div class="hero-art" aria-hidden="true"><span class="art-line">ことば</span><span class="art-english">a little,<br>every day.</span><span class="art-rule"></span><span class="art-dot"></span></div></section>
+    ${state.records.some(isDiary) ? '<div class="diary-shortcut"><button class="button secondary" data-action="start-diary-study">日記セットを復習 <span aria-hidden="true">→</span></button><p class="fine">ひとつの日記を、文の順番どおりに。</p></div>' : ""}
     <section class="metrics" aria-label="学習の概要">${metric(s.total, "ノートの表現")}${metric(s.studied, "学習済み")}${metric(s.weak, "苦手な表現")}</section>
     ${
       !s.total
@@ -108,18 +111,67 @@ export function home(state) {
     <p class="privacy-note">端末内に保存 · ログイン不要 · 広告・アクセス解析なし</p>`;
 }
 
+function readCounter(r, p, inputId = "read-count") {
+  return `<div class="read-counter"><label>自分で音読した回数<input id="${inputId}" type="number" min="0" max="1000000000" step="1" value="${p.read_aloud_count}" inputmode="numeric"></label><button class="button secondary small" data-action="set-read" data-id="${escape(r.sentence_id)}" data-read-input="${inputId}">回数を保存</button><button class="button secondary small" data-action="add-read" data-id="${escape(r.sentence_id)}">音読 ＋1</button></div>`;
+}
+
+function gradeButtons(set = false) {
+  return `<div class="grade-buttons"><button class="button secondary" data-action="grade-again">${set ? "セットをもう一度" : "もう一度"}</button><button class="button" data-action="grade-remembered">${set ? "セットを覚えた" : "覚えた"} <span aria-hidden="true">✓</span></button></div>`;
+}
+
+function diaryCard(state, ui, records) {
+  const session = ui.session;
+  return `<section class="study-card diary-card" aria-label="日記セットの復習問題"><div class="study-top"><span class="eyebrow">DIARY SET ${session.index + 1} / ${session.items.length}</span><span class="badge">${records.length}文の日記セット</span></div><p class="fine">${escape(records[0].date_jst)} · 順番どおりに、ひとつの話を英語に。</p><div id="question" class="diary-questions"><ol>${records.map((r) => `<li class="diary-japanese"><p>${escape(r.study_japanese)}</p></li>`).join("")}</ol></div>
+    ${
+      !ui.answer
+        ? '<p class="muted">日記全体を英語で考えて、声に出してみましょう。</p><button class="button wide" data-action="reveal">答えを見る</button>'
+        : `<div id="answer" class="answer"><p class="eyebrow">DIARY ANSWER</p><div class="set-actions"><button class="button secondary" data-action="speak-set" aria-label="日記全体を読み上げる">日記を読み上げる ▷</button><button class="button secondary" data-action="add-read-set">セットを音読 ＋1</button></div><p class="fine">音読 ＋1は各文の音読回数に加算します。音声再生だけでは加算しません。</p><ol class="diary-answers">${records
+            .map(
+              (r, index) =>
+                `<li class="diary-answer" data-sentence-id="${escape(r.sentence_id)}"><h3>${index + 1}文目</h3><p class="english answer-english diary-answer-english" lang="en">${escape(r.english)}</p>${notes(r)}<details class="sentence-tools" data-sentence-tools="${escape(r.sentence_id)}"${session.tools.has(r.sentence_id) || session.grades.has(r.sentence_id) ? " open" : ""}><summary>音読 ${pFor(state, r.sentence_id).read_aloud_count}回・文ごとの操作</summary><button class="button secondary small" data-action="speak" data-id="${escape(r.sentence_id)}">この文を読み上げる ▷</button>${readCounter(r, pFor(state, r.sentence_id), `read-count-${index}`)}<details class="sentence-assessment"${session.grades.has(r.sentence_id) ? " open" : ""}><summary>この文だけ判定を変える</summary><label>${index + 1}文目の自己採点<select data-sentence-grade="${escape(r.sentence_id)}">${options(
+                  [
+                    ["", "セットと同じ"],
+                    ["remembered", "覚えた"],
+                    ["again", "もう一度"],
+                  ],
+                  session.grades.get(r.sentence_id) ?? "",
+                )}</select></label></details></details></li>`,
+            )
+            .join(
+              "",
+            )}</ol><p class="fine">セット全体を自己採点して次へ。個別に選んだ文は、その判定を優先します。履歴は文ごとに保存します。</p>${gradeButtons(true)}</div>`
+    }</section>`;
+}
+
 export function study(state, ui) {
   const filters = state.settings.filters;
-  let count = 0;
+  let items = [];
   try {
-    count = selectQuestions(state.records, state.progress, filters).length;
+    items = selectReviewItems(state.records, state.progress, filters);
   } catch {
     /* form displays range validation */
   }
-  const config = `<details class="panel study-config"${!ui.session ? " open" : ""}><summary>出題設定 <span class="muted">${count}件が対象</span></summary><div class="form-grid">
+  const sets = items.filter((item) => item.type === "diary-set").length;
+  const sentenceCount = items.reduce(
+    (count, item) => count + item.ids.length,
+    0,
+  );
+  const countLabel = sets
+    ? `${sets}日記セット${items.length > sets ? `・${items.length - sets}文` : ""}（全${sentenceCount}文）が対象`
+    : `${items.length}件が対象`;
+  const config = `<details class="panel study-config"${(ui.studyConfigOpen ?? !ui.session) ? " open" : ""}><summary>出題設定 <span class="muted">${countLabel}</span></summary><div class="form-grid">
+    <label class="full">復習の単位<select id="study-unit">${options(
+      [
+        ["auto", "標準：日記はセット、フレーズは1文"],
+        ["diary-set", "日記セット復習（日記のみ）"],
+        ["sentence", "1文ずつ復習（従来のモード）"],
+      ],
+      filters.unit ?? "auto",
+    )}</select></label>
     <label class="full">かんたんモード<select id="study-mode">${options(
       [
         ["all", "すべてランダム"],
+        ["diary-set", "日記セット復習（おすすめ）"],
         ["diary", "英語日記のみ"],
         ["daily", "日常フレーズのみ"],
         ["business", "ビジネス英語のみ"],
@@ -152,7 +204,7 @@ export function study(state, ui) {
       filters.order,
     )}</select></label>
     <div></div><label>開始日<input id="study-from" type="date" value="${escape(filters.from)}"></label><label>終了日<input id="study-to" type="date" value="${escape(filters.to)}"></label></div>
-    <button class="button" data-action="start-study">${ui.session ? "この条件で新しくはじめる" : "この条件で復習する"}</button><p class="fine">1回の復習では、同じ問題を繰り返し出しません。設定は自動保存されます。</p></details>`;
+    <button class="button" data-action="start-study">${ui.session ? "この条件で新しくはじめる" : "この条件で復習する"}</button><p class="fine">日記セットは条件に合う文が1つでもあれば、日記全体を出題します。セット内は文番号順、番号がない文はIDの自然順です。1回の復習で同じセットは繰り返しません。条件の変更は次に復習をはじめると適用されます。</p></details>`;
   let content;
   const session = ui.session;
   if (!session)
@@ -161,12 +213,16 @@ export function study(state, ui) {
       "日本語を見たら英語を考えて、答えを確認。最後に自分で採点します。",
       "",
     );
-  else if (session.index >= session.ids.length)
-    content = `<section class="panel session-finished"><p class="eyebrow">SESSION COMPLETE</p><h2>おつかれさまでした。</h2><p>${session.ids.length}件の復習が終わりました。</p><div class="metrics">${metric(session.remembered, "覚えた")}${metric(session.again, "もう一度")}</div><button class="button" data-action="start-study">もう一度、復習する</button><a class="button secondary" href="#home">ホームへ</a></section>`;
+  else if (session.index >= session.items.length)
+    content = `<section class="panel session-finished"><p class="eyebrow">SESSION COMPLETE</p><h2>おつかれさまでした。</h2><p>${session.items.length}件（全${session.items.reduce((n, item) => n + item.ids.length, 0)}文）の復習が終わりました。</p><div class="metrics">${metric(session.remembered, "覚えた文")}${metric(session.again, "もう一度の文")}</div><button class="button" data-action="start-study">もう一度、復習する</button><a class="button secondary" href="#home">ホームへ</a></section>`;
   else {
-    const id = session.ids[session.index];
+    const item = session.items[session.index];
+    const id = item.ids[0];
     const r = state.records.find((r) => r.sentence_id === id);
-    if (!r)
+    const records = item.ids.map((id) =>
+      state.records.find((r) => r.sentence_id === id),
+    );
+    if (records.some((r) => !r))
       return (
         heading("PRACTICE", "復習する") +
         config +
@@ -176,12 +232,17 @@ export function study(state, ui) {
           "",
         )
       );
-    const p = pFor(state, id);
-    content = `<section class="study-card" aria-label="復習問題"><div class="study-top"><span class="eyebrow">QUESTION ${session.index + 1} / ${session.ids.length}</span>${badge(r)}</div><p class="fine">${escape(r.date_jst)} · 日本語を英語にしてみましょう</p><h2 id="question" class="question ${r.study_japanese.length > 100 ? "long" : ""}">${escape(r.study_japanese)}</h2>
-      ${!ui.answer ? '<p class="muted">まずは自分で考えて、声に出してみてください。</p><button class="button wide" data-action="reveal">答えを見る</button>' : `<div id="answer" class="answer"><p class="eyebrow">ANSWER</p><p class="english answer-english" lang="en">${escape(r.english)}</p><button class="button secondary" data-action="speak" data-id="${escape(id)}">英文を読み上げる <span aria-hidden="true">▷</span></button><p class="fine">端末内の英語音声を使用 · 再生だけでは音読回数に加算しません</p>${notes(r)}<div class="read-counter"><label>自分で音読した回数<input id="read-count" type="number" min="0" max="1000000000" step="1" value="${p.read_aloud_count}" inputmode="numeric"></label><button class="button secondary small" data-action="set-read" data-id="${escape(id)}">回数を保存</button><button class="button secondary small" data-action="add-read" data-id="${escape(id)}">音読 ＋1</button></div><p class="fine">思い出せましたか？ 自分で採点して、次の問題へ。</p><div class="grade-buttons"><button class="button secondary" data-action="grade-again">もう一度</button><button class="button" data-action="grade-remembered">覚えた <span aria-hidden="true">✓</span></button></div></div>`}</section>`;
+    if (item.type === "diary-set") content = diaryCard(state, ui, records);
+    else
+      content = `<section class="study-card" aria-label="復習問題"><div class="study-top"><span class="eyebrow">QUESTION ${session.index + 1} / ${session.items.length}</span>${badge(r)}</div><p class="fine">${escape(r.date_jst)} · 日本語を英語にしてみましょう</p><h2 id="question" class="question ${r.study_japanese.length > 100 ? "long" : ""}">${escape(r.study_japanese)}</h2>
+      ${!ui.answer ? '<p class="muted">まずは自分で考えて、声に出してみてください。</p><button class="button wide" data-action="reveal">答えを見る</button>' : `<div id="answer" class="answer"><p class="eyebrow">ANSWER</p><p class="english answer-english" lang="en">${escape(r.english)}</p><button class="button secondary" data-action="speak" data-id="${escape(id)}">英文を読み上げる <span aria-hidden="true">▷</span></button><p class="fine">端末内の英語音声を使用 · 再生だけでは音読回数に加算しません</p>${notes(r)}${readCounter(r, pFor(state, id))}<p class="fine">思い出せましたか？ 自分で採点して、次の問題へ。</p>${gradeButtons()}</div>`}</section>`;
   }
   return (
-    heading("PRACTICE", "復習する", "ひとつずつ、あなたのことばに。") +
+    heading(
+      "PRACTICE",
+      "復習する",
+      "日記はひとつの話として、フレーズはひとつずつ。",
+    ) +
     config +
     content
   );
@@ -206,7 +267,7 @@ export function library(state, ui) {
 
 function recordCard(r, state) {
   const p = pFor(state, r.sentence_id);
-  return `<details class="record-card"><summary><span class="record-meta">${escape(r.date_jst)} ${badge(r)}${p.last_reviewed_at ? `<span class="progress-dot ${isWeak(p) ? "weak" : ""}">${isWeak(p) ? "もう一度" : "学習済み"}</span>` : ""}</span><span class="record-japanese">${escape(r.study_japanese)}</span><span class="record-english" lang="en">${escape(r.english)}</span></summary><div class="record-detail">${notes(r)}${r.tags?.length ? `<p class="tag-list">${r.tags.map((t) => `<span>#${escape(t)}</span>`).join(" ")}</p>` : ""}<p class="fine">正解 ${p.correct_count}回 · もう一度 ${p.incorrect_count}回 · 音読 ${p.read_aloud_count}回</p><p class="fine">元データの種類：${escape(r.entry_type)} · ID：${escape(r.sentence_id)}</p><div class="actions"><button class="button secondary small" data-action="study-one" data-id="${escape(r.sentence_id)}">この表現を復習</button><button class="button secondary small" data-action="edit" data-id="${escape(r.sentence_id)}">編集</button><button class="button text-danger small" data-action="delete" data-id="${escape(r.sentence_id)}">削除</button></div></div></details>`;
+  return `<details class="record-card"><summary><span class="record-meta">${escape(r.date_jst)} ${badge(r)}${p.last_reviewed_at ? `<span class="progress-dot ${isWeak(p) ? "weak" : ""}">${isWeak(p) ? "もう一度" : "学習済み"}</span>` : ""}</span><span class="record-japanese">${escape(r.study_japanese)}</span><span class="record-english" lang="en">${escape(r.english)}</span></summary><div class="record-detail">${notes(r)}${r.tags?.length ? `<p class="tag-list">${r.tags.map((t) => `<span>#${escape(t)}</span>`).join(" ")}</p>` : ""}<p class="fine">正解 ${p.correct_count}回 · もう一度 ${p.incorrect_count}回 · 音読 ${p.read_aloud_count}回</p><p class="fine">元データの種類：${escape(r.entry_type)} · ID：${escape(r.sentence_id)}</p><div class="actions"><button class="button secondary small" data-action="study-one" data-id="${escape(r.sentence_id)}">この表現を復習</button>${isDiary(r) ? `<button class="button secondary small" data-action="study-entry" data-id="${escape(r.sentence_id)}">日記セットを復習</button>` : ""}<button class="button secondary small" data-action="edit" data-id="${escape(r.sentence_id)}">編集</button><button class="button text-danger small" data-action="delete" data-id="${escape(r.sentence_id)}">削除</button></div></div></details>`;
 }
 
 export function libraryResults(state, ui) {
@@ -250,7 +311,19 @@ export function libraryResults(state, ui) {
   const pages = Math.ceil(rows.length / size);
   ui.list.page = Math.min(ui.list.page, pages - 1);
   const slice = rows.slice(ui.list.page * size, (ui.list.page + 1) * size);
-  return `<p class="result-count">${records.length}件の表現${ui.list.group === "entry" ? ` · ${rows.length}のまとまり` : ""} <span>${ui.list.page + 1} / ${pages}ページ</span></p>${slice.map((row) => (Array.isArray(row) ? `<section class="entry-group"><h2>${escape(row[0].date_jst)} <span class="fine">${row.length}文 · ${escape(row[0].entry_id)}</span></h2>${row.map((r) => recordCard(r, state)).join("")}</section>` : recordCard(row, state))).join("")}<div class="pagination"><button class="button secondary small" data-action="prev-page"${ui.list.page === 0 ? " disabled" : ""}>前のページ</button><span>${ui.list.page + 1} / ${pages}</span><button class="button secondary small" data-action="next-page"${ui.list.page >= pages - 1 ? " disabled" : ""}>次のページ</button></div>`;
+  return `<p class="result-count">${records.length}件の表現${ui.list.group === "entry" ? ` · ${rows.length}のまとまり` : ""} <span>${ui.list.page + 1} / ${pages}ページ</span></p>${slice
+    .map((row) =>
+      Array.isArray(row)
+        ? `<section class="entry-group"><h2>${escape(row[0].date_jst)} <span class="fine">${row.length}文 · ${escape(row[0].entry_id)}</span></h2>${sortDiarySentences(
+            row,
+          )
+            .map((r) => recordCard(r, state))
+            .join("")}</section>`
+        : recordCard(row, state),
+    )
+    .join(
+      "",
+    )}<div class="pagination"><button class="button secondary small" data-action="prev-page"${ui.list.page === 0 ? " disabled" : ""}>前のページ</button><span>${ui.list.page + 1} / ${pages}</span><button class="button secondary small" data-action="next-page"${ui.list.page >= pages - 1 ? " disabled" : ""}>次のページ</button></div>`;
 }
 
 function manualForm(state, ui) {
@@ -384,7 +457,7 @@ export function settings(state, ui) {
     rates.sort((a, b) => a[0] - b[0]),
     state.settings.speechRate,
   )}</select></label><p class="fine">端末内の英語音声だけを使います。利用できない場合はChrome・端末の音声設定を確認してください。カタカナ表記とは独立した機能です。</p><hr><h3>端末の保存領域</h3><p id="storage-info" class="muted">${escape(ui.storageInfo ?? "保存領域の状態を確認中…")}</p><button class="button secondary" data-action="persist-storage">永続ストレージを要求</button><p class="fine">許可されても、ブラウザのデータ削除や端末の故障は防げません。シークレットモードでの利用は避け、必ずバックアップしてください。</p></section>
-  <section class="panel soft"><h2>ホーム画面に追加</h2><p>Android Chromeのメニューから「ホーム画面に追加」または「アプリをインストール」を選べます。</p>${ui.installPrompt ? '<button class="button secondary" data-action="install-app">ホーム画面に追加する</button>' : ""}<p class="fine">初回の読み込み後はオフラインでも利用できます。データはブラウザ・端末ごとに保存され、自動同期はしません。音声は端末内の対応音声が必要です。</p><p class="fine">アプリ v1.0.0 · 表示日時は日本時間（JST）</p></section>`
+  <section class="panel soft"><h2>ホーム画面に追加</h2><p>Android Chromeのメニューから「ホーム画面に追加」または「アプリをインストール」を選べます。</p>${ui.installPrompt ? '<button class="button secondary" data-action="install-app">ホーム画面に追加する</button>' : ""}<p class="fine">初回の読み込み後はオフラインでも利用できます。データはブラウザ・端末ごとに保存され、自動同期はしません。音声は端末内の対応音声が必要です。</p><p class="fine">アプリ v1.1.0 · 表示日時は日本時間（JST）</p></section>`
   );
 }
 

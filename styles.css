@@ -781,6 +781,85 @@ summary::marker {
   min-height: 58px;
   font-size: 16px;
 }
+.diary-shortcut {
+  margin-top: 18px;
+  text-align: center;
+}
+.diary-questions {
+  margin: 28px 0;
+}
+.diary-questions ol {
+  padding-left: 1.6em;
+  margin: 0;
+}
+.diary-japanese {
+  padding-left: 6px;
+  margin: 16px 0;
+  font-size: clamp(18px, 3vw, 23px);
+  line-height: 1.9;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.diary-japanese::marker {
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 600;
+}
+.diary-japanese p {
+  margin: 0;
+}
+.diary-answers {
+  list-style: none;
+  padding: 0;
+  margin: 22px 0;
+}
+.diary-answer {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 18px;
+  margin-bottom: 18px;
+  min-width: 0;
+}
+.diary-answer h3 {
+  font-size: 12px;
+  color: var(--muted);
+}
+.diary-answer .answer-english {
+  font-size: clamp(21px, 4vw, 27px);
+}
+.diary-answer .read-counter {
+  padding: 12px;
+}
+.sentence-assessment {
+  margin-top: 16px;
+}
+.sentence-assessment summary {
+  min-height: 44px;
+}
+.set-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.set-actions .button {
+  flex: 1 1 130px;
+  padding: 10px;
+  font-size: 12px;
+}
+.sentence-tools {
+  margin-top: 12px;
+}
+.sentence-tools > summary {
+  font-size: 12px;
+  min-height: 44px;
+  color: var(--muted);
+}
+.diary-card .grade-buttons .button {
+  font-size: 14px;
+  padding: 12px 8px;
+  min-height: 60px;
+  gap: 6px;
+}
 .session-finished {
   text-align: center;
   padding: 40px 24px;

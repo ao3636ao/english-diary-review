@@ -10,6 +10,7 @@ export const CATEGORIES = {
   other: "その他",
 };
 export const DEFAULT_FILTERS = {
+  unit: "auto",
   category: "all",
   status: "all",
   order: "random",
@@ -317,16 +318,58 @@ export function setReadCount(progress, value, date = now()) {
   return { ...progress, read_aloud_count: value, updated_at: date };
 }
 
-export function selectQuestions(
-  records,
+function updateProgress(progress, ids, update) {
+  const next = new Map(progress.map((p) => [p.sentence_id, p]));
+  for (const id of new Set(ids))
+    next.set(id, update(next.get(id) ?? emptyProgress(id), id));
+  return [...next.values()];
+}
+
+export function gradeReview(
   progress,
-  filters = DEFAULT_FILTERS,
-  random = Math.random,
+  ids,
+  result,
+  overrides = new Map(),
+  date = now(),
 ) {
+  return updateProgress(progress, ids, (p, id) =>
+    grade(p, overrides.get(id) ?? result, date),
+  );
+}
+
+export function readReview(progress, ids, date = now()) {
+  return updateProgress(progress, ids, (p) =>
+    setReadCount(p, p.read_aloud_count + 1, date),
+  );
+}
+
+export const isDiary = (r) =>
+  r.entry_type === "diary" || r.category === "diary";
+
+export function sortDiarySentences(records) {
+  const number = (r) => {
+    const value = r.sentence_no;
+    if (
+      (typeof value !== "number" && typeof value !== "string") ||
+      String(value).trim() === ""
+    )
+      return Infinity;
+    const n = Number(value);
+    return Number.isSafeInteger(n) && n >= 0 ? n : Infinity;
+  };
+  return [...records].sort(
+    (a, b) =>
+      (number(a) === number(b) ? 0 : number(a) < number(b) ? -1 : 1) ||
+      a.sentence_id.localeCompare(b.sentence_id, "en", { numeric: true }) ||
+      a.sentence_id.localeCompare(b.sentence_id, "en"),
+  );
+}
+
+function matchingQuestions(records, progress, filters) {
   if (filters.from && filters.to && filters.from > filters.to)
     fail("開始日は終了日以前にしてください。");
   const pmap = new Map(progress.map((p) => [p.sentence_id, p]));
-  const selected = records.filter((r) => {
+  return records.filter((r) => {
     const p = pmap.get(r.sentence_id) ?? emptyProgress(r.sentence_id);
     return (
       (filters.category === "all" ||
@@ -341,10 +384,94 @@ export function selectQuestions(
       (!filters.to || r.date_jst <= filters.to)
     );
   });
-  for (let i = selected.length - 1; i > 0; i--) {
+}
+
+function shuffle(items, random) {
+  for (let i = items.length - 1; i > 0; i--) {
     const j = Math.floor(random() * (i + 1));
-    [selected[i], selected[j]] = [selected[j], selected[i]];
+    [items[i], items[j]] = [items[j], items[i]];
   }
+  return items;
+}
+
+const weakScore = (p) =>
+  Number(isWeak(p)) * 1000 +
+  (p ? p.incorrect_count / (p.correct_count + p.incorrect_count || 1) : 0);
+
+export function selectReviewItems(
+  records,
+  progress,
+  filters = DEFAULT_FILTERS,
+  random = Math.random,
+) {
+  const unit = filters.unit ?? "auto";
+  if (!["auto", "sentence", "diary-set"].includes(unit))
+    fail("復習の単位が不正です。");
+  const selected = new Set(
+    matchingQuestions(records, progress, filters).map((r) => r.sentence_id),
+  );
+  const groups = new Map();
+  for (const r of records) {
+    const diary = isDiary(r);
+    if (unit === "diary-set" && !diary) continue;
+    const group = diary && unit !== "sentence";
+    const key = JSON.stringify([
+      group ? "diary-set" : "sentence",
+      group ? r.entry_id : r.sentence_id,
+    ]);
+    if (!groups.has(key))
+      groups.set(key, {
+        type: group ? "diary-set" : "sentence",
+        entry_id: r.entry_id,
+        records: [],
+      });
+    groups.get(key).records.push(r);
+  }
+  const items = [];
+  for (const group of groups.values()) {
+    if (!group.records.some((r) => selected.has(r.sentence_id))) continue;
+    const ordered =
+      group.type === "diary-set"
+        ? sortDiarySentences(group.records)
+        : group.records;
+    items.push({
+      type: group.type,
+      entry_id: group.entry_id,
+      ids: ordered.map((r) => r.sentence_id),
+    });
+  }
+  // Shuffle whole sets once: long diaries must not get extra chances to appear first.
+  shuffle(items, random);
+  const recordMap = new Map(records.map((r) => [r.sentence_id, r]));
+  const pmap = new Map(progress.map((p) => [p.sentence_id, p]));
+  const date = (item) =>
+    item.ids.map((id) => recordMap.get(id).date_jst).sort()[0];
+  if (filters.order === "date")
+    items.sort(
+      (a, b) =>
+        date(a).localeCompare(date(b)) ||
+        a.ids[0].localeCompare(b.ids[0], "en", { numeric: true }),
+    );
+  if (filters.order === "weak")
+    items.sort(
+      (a, b) =>
+        Math.max(...b.ids.map((id) => weakScore(pmap.get(id)))) -
+        Math.max(...a.ids.map((id) => weakScore(pmap.get(id)))),
+    );
+  return items;
+}
+
+export function selectQuestions(
+  records,
+  progress,
+  filters = DEFAULT_FILTERS,
+  random = Math.random,
+) {
+  const pmap = new Map(progress.map((p) => [p.sentence_id, p]));
+  const selected = shuffle(
+    matchingQuestions(records, progress, filters),
+    random,
+  );
   if (filters.order === "date")
     selected.sort(
       (a, b) =>
@@ -354,11 +481,7 @@ export function selectQuestions(
   if (filters.order === "weak")
     selected.sort((a, b) => {
       const score = (r) => {
-        const p = pmap.get(r.sentence_id) ?? emptyProgress(r.sentence_id);
-        return (
-          Number(isWeak(p)) * 1000 +
-          p.incorrect_count / (p.correct_count + p.incorrect_count || 1)
-        );
+        return weakScore(pmap.get(r.sentence_id));
       };
       return score(b) - score(a);
     });
@@ -400,7 +523,8 @@ export function validateSettings(raw) {
     typeof f.category !== "string" ||
     f.category.length > 100 ||
     !["all", "unseen", "wrong", "weak"].includes(f.status) ||
-    !["random", "date", "weak"].includes(f.order)
+    !["random", "date", "weak"].includes(f.order) ||
+    !["auto", "sentence", "diary-set"].includes(f.unit)
   )
     fail("出題設定が不正です。");
   if (

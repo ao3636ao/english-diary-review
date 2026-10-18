@@ -44,3 +44,25 @@ export const oneRecord = () => ({
   alternative_english: ["A fictional alternative."],
   extra_source: { keep: true },
 });
+
+export function diarySets(lengths = [2, 3, 4, 5]) {
+  return lengths
+    .flatMap((length, entry) =>
+      Array.from({ length }, (_, index) => ({
+        sentence_id: `fiction-set-${entry + 1}-sentence-${index + 1}`,
+        entry_id: `fiction-set-${entry + 1}`,
+        sentence_no: index + 1,
+        entry_type: "diary",
+        category: "diary",
+        date_jst: `2026-10-${String(entry + 1).padStart(2, "0")}`,
+        study_japanese: `架空の日記${entry + 1}：${index + 1}文目。`,
+        english: `Fictional diary ${entry + 1}, sentence ${index + 1}.`,
+        katakana:
+          index === 1
+            ? ""
+            : `フィクショナル ダイアリー ${entry + 1} → ${index + 1}`,
+        source_metadata: { fictional: true, position: index + 1 },
+      })),
+    )
+    .reverse();
+}
