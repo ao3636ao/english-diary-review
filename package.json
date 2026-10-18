@@ -1,0 +1,19 @@
+{
+  "name": "english-diary-review",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "端末内に保存する英語日記・フレーズ復習アプリ",
+  "scripts": {
+    "start": "node scripts/serve.mjs",
+    "test": "node --test tests/core.test.js",
+    "test:e2e": "playwright test",
+    "test:all": "npm test && npm run test:e2e"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.1"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
