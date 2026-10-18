@@ -6,9 +6,10 @@ import {
   applyImport,
   normalizeRecord,
   emptyProgress,
-  grade,
+  gradeReview,
+  readReview,
   setReadCount,
-  selectQuestions,
+  selectReviewItems,
   makeBackup,
   validateBackup,
   mergeBackup,
@@ -21,6 +22,7 @@ import { render, libraryResults, escape, displayTime } from "./views.js";
 const main = document.querySelector("#main");
 const ui = {
   session: null,
+  studyConfigOpen: true,
   answer: false,
   mode: "custom",
   list: { query: "", category: "all", group: "sentence", page: 0 },
@@ -266,32 +268,58 @@ function setProgress(progress) {
   };
 }
 
-function startSession(ids) {
-  if (!ids.length) {
+function startSession(items) {
+  if (!items.length) {
+    ui.session = null;
+    ui.answer = false;
+    ui.studyConfigOpen = true;
     notify(
       "この条件に合う問題がありません。出題条件を変えるか、表現を追加してください。",
     );
     go("study");
     return;
   }
-  ui.session = { ids, index: 0, remembered: 0, again: 0 };
+  ui.session = {
+    items,
+    index: 0,
+    remembered: 0,
+    again: 0,
+    grades: new Map(),
+    tools: new Set(),
+  };
+  ui.studyConfigOpen = false;
   ui.answer = false;
   go("study");
 }
 
+function currentReview() {
+  const item = ui.session?.items[ui.session.index];
+  if (!item)
+    throw new Error("復習する問題がありません。復習をはじめ直してください。");
+  item.ids.forEach(currentRecord);
+  return item;
+}
+
 async function gradeCurrent(result) {
   const session = ui.session;
-  if (!session || !ui.answer || session.index >= session.ids.length) return;
-  const id = session.ids[session.index];
-  currentRecord(id);
-  const progress =
-    state.progress.find((p) => p.sentence_id === id) ?? emptyProgress(id);
-  await save(setProgress(grade(progress, result)));
-  session[result === "remembered" ? "remembered" : "again"]++;
+  if (!session || !ui.answer || session.index >= session.items.length) return;
+  const { ids } = currentReview();
+  const outcomes = ids.map((id) => session.grades.get(id) ?? result);
+  await save({
+    ...state,
+    progress: gradeReview(state.progress, ids, result, session.grades),
+  });
+  for (const outcome of outcomes)
+    session[outcome === "remembered" ? "remembered" : "again"]++;
   session.index++;
+  session.grades.clear();
+  session.tools.clear();
   ui.answer = false;
   renderPage();
   main.focus({ preventScroll: true });
+  document
+    .querySelector(".study-card, .session-finished")
+    ?.scrollIntoView({ block: "start" });
 }
 
 async function changeReadCount(id, value) {
@@ -303,7 +331,7 @@ async function changeReadCount(id, value) {
   notify(`音読回数を${value}回に保存しました。`);
 }
 
-function speak(id) {
+function speakText(text) {
   if (!("speechSynthesis" in window) || !("SpeechSynthesisUtterance" in window))
     throw new Error("このブラウザは音声読み上げに対応していません。");
   const voices = speechSynthesis
@@ -314,7 +342,7 @@ function speak(id) {
       "端末内で利用できる英語音声がありません。Androidの音声読み上げ設定で英語のオフライン音声を追加してください。外部への送信を避けるため、オンライン音声では読み上げません。",
     );
   speechSynthesis.cancel();
-  const speech = new SpeechSynthesisUtterance(currentRecord(id).english);
+  const speech = new SpeechSynthesisUtterance(text);
   speech.voice = voices.find((v) => /^en[-_]US$/i.test(v.lang)) ?? voices[0];
   speech.lang = speech.voice.lang;
   speech.rate = state.settings.speechRate;
@@ -381,22 +409,43 @@ const actions = {
   "retry-download": () => exportBackup({ retry: true }),
   "start-study": () =>
     startSession(
-      selectQuestions(
-        state.records,
-        state.progress,
-        state.settings.filters,
-      ).map((r) => r.sentence_id),
+      selectReviewItems(state.records, state.progress, state.settings.filters),
     ),
+  "start-diary-study": async () => {
+    const filters = { ...DEFAULT_FILTERS, unit: "diary-set" };
+    await save({
+      ...state,
+      settings: validateSettings({ ...state.settings, filters }),
+    });
+    ui.mode = "diary-set";
+    startSession(selectReviewItems(state.records, state.progress, filters));
+  },
   "study-one": (button) => {
-    currentRecord(button.dataset.id);
-    startSession([button.dataset.id]);
+    const r = currentRecord(button.dataset.id);
+    startSession([
+      { type: "sentence", entry_id: r.entry_id, ids: [r.sentence_id] },
+    ]);
+  },
+  "study-entry": (button) => {
+    const r = currentRecord(button.dataset.id);
+    const item = selectReviewItems(state.records, state.progress, {
+      ...DEFAULT_FILTERS,
+      unit: "diary-set",
+    }).find((item) => item.entry_id === r.entry_id);
+    startSession(item ? [item] : []);
   },
   reveal: () => {
     ui.answer = true;
     renderPage();
-    document.querySelector("#answer")?.scrollIntoView({ block: "nearest" });
+    document.querySelector("#answer")?.scrollIntoView({ block: "start" });
   },
-  speak: (button) => speak(button.dataset.id),
+  speak: (button) => speakText(currentRecord(button.dataset.id).english),
+  "speak-set": () =>
+    speakText(
+      currentReview()
+        .ids.map((id) => currentRecord(id).english)
+        .join("\n"),
+    ),
   "grade-remembered": () => gradeCurrent("remembered"),
   "grade-again": () => gradeCurrent("again"),
   "add-read": (button) => {
@@ -408,8 +457,16 @@ const actions = {
   "set-read": (button) =>
     changeReadCount(
       button.dataset.id,
-      Number(document.querySelector("#read-count").value),
+      Number(
+        document.getElementById(button.dataset.readInput || "read-count").value,
+      ),
     ),
+  "add-read-set": async () => {
+    const { ids } = currentReview();
+    await save({ ...state, progress: readReview(state.progress, ids) });
+    renderPage();
+    notify(`日記の${ids.length}文それぞれに音読1回を保存しました。`);
+  },
   "prev-page": () => {
     ui.list.page = Math.max(0, ui.list.page - 1);
     updateList();
@@ -622,8 +679,31 @@ document.addEventListener("submit", (event) => {
   });
 });
 
+main.addEventListener(
+  "toggle",
+  (event) => {
+    const target = event.target;
+    if (!target.isConnected) return;
+    if (target.matches("details.study-config"))
+      ui.studyConfigOpen = target.open;
+    if (target.matches("details.sentence-tools") && ui.session) {
+      if (target.open) ui.session.tools.add(target.dataset.sentenceTools);
+      else ui.session.tools.delete(target.dataset.sentenceTools);
+    }
+  },
+  true,
+);
+
 document.addEventListener("change", (event) => {
   const e = event.target;
+  if (e.dataset.sentenceGrade !== undefined && ui.session) {
+    const id = e.dataset.sentenceGrade;
+    if (currentReview().ids.includes(id)) {
+      if (e.value === "remembered" || e.value === "again")
+        ui.session.grades.set(id, e.value);
+      else ui.session.grades.delete(id);
+    }
+  }
   if (["import-file", "restore-file"].includes(e.id)) {
     void run(async () => {
       const source = await fileText(e.files[0]);
@@ -658,7 +738,8 @@ document.addEventListener("change", (event) => {
       if (e.id === "study-mode") {
         ui.mode = e.value;
         if (e.value !== "custom") {
-          filters = { ...DEFAULT_FILTERS };
+          filters = { ...DEFAULT_FILTERS, unit: filters.unit ?? "auto" };
+          if (e.value === "diary-set") filters.unit = "diary-set";
           if (["diary", "daily", "business", "practice"].includes(e.value))
             filters.category = e.value;
           if (["unseen", "wrong"].includes(e.value)) filters.status = e.value;

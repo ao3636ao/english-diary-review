@@ -1,5 +1,5 @@
 /* Only the public app shell is cached. Diary data stays in IndexedDB. */
-const CACHE = "english-diary-review-shell-v1";
+const CACHE = "english-diary-review-shell-v2";
 const FILES = [
   "./",
   "./index.html",
