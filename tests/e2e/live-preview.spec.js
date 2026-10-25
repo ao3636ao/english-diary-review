@@ -10,7 +10,10 @@ test("ルートのライブサーバーでアセットとホーム・日記追�
   page.on("pageerror", (error) => errors.push(error.message));
   page.on("response", (response) => {
     const url = new URL(response.url());
-    if (url.origin === origin && /\.(css|js|svg|png)$/.test(url.pathname)) {
+    if (
+      url.origin === origin &&
+      /\.(css|js|svg|png|webp)$/.test(url.pathname)
+    ) {
       assets.set(url.pathname, {
         status: response.status(),
         type: response.headers()["content-type"],
@@ -19,17 +22,13 @@ test("ルートのライブサーバーでアセットとホーム・日記追�
   });
 
   await page.goto(`${origin}/`);
-  await expect(page.getByRole("heading", { level: 1 })).toContainText(
-    "今日のことばを、",
-  );
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("復習");
+  await expect(page).toHaveTitle("PLAY BACK — 英語日記・フレーズ復習");
   await expect(page.locator("html")).toHaveCSS(
     "background-color",
-    "rgb(248, 249, 245)",
+    "rgb(255, 255, 255)",
   );
-  await expect(page.locator(".hero")).toHaveCSS(
-    "background-color",
-    "rgb(25, 63, 54)",
-  );
+  await expect(page.locator(".hero-image")).toHaveCSS("object-fit", "contain");
   await expect(page.locator(".bottom-nav")).toHaveCSS("display", "grid");
   expect(
     await page
@@ -47,7 +46,9 @@ test("ルートのライブサーバーでアセットとホーム・日記追�
     expect(assets.get(path)?.status).toBe(200);
     expect(assets.get(path)?.type).toContain("javascript");
   }
-  expect(assets.get("/icons/icon.svg")?.status).toBe(200);
+  expect(assets.get("/assets/playback-wordmark.png")?.status).toBe(200);
+  expect(assets.get("/assets/hero-grassland.webp")?.status).toBe(200);
+  expect(assets.get("/assets/hero-grassland.webp")?.type).toBe("image/webp");
   await page.screenshot({
     path: testInfo.outputPath("home.png"),
     fullPage: true,
@@ -90,9 +91,7 @@ test("ルートのライブサーバーでアセットとホーム・日記追�
 
   await page.locator('[data-view="home"]').click();
   await expect(page.locator(".metrics .metric").first()).toContainText("1");
-  await page
-    .getByRole("button", { name: "今日の学習をはじめる", exact: false })
-    .click();
+  await page.getByRole("button", { name: "1文ずつ復習", exact: true }).click();
   await expect(page.locator("#question")).toHaveText(
     "架空の日記で、青いノートを開いた。",
   );

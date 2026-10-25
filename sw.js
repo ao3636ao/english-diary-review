@@ -1,5 +1,5 @@
 /* Only the public app shell is cached. Diary data stays in IndexedDB. */
-const CACHE = "english-diary-review-shell-v2";
+const CACHE = "english-diary-review-shell-playback-v3";
 const FILES = [
   "./",
   "./index.html",
@@ -9,9 +9,12 @@ const FILES = [
   "./src/db.js",
   "./src/views.js",
   "./manifest.webmanifest",
-  "./icons/icon.svg",
-  "./icons/icon-192.png",
-  "./icons/icon-512.png",
+  "./assets/playback-wordmark.png",
+  "./assets/hero-grassland.webp",
+  "./assets/playback-icon-96.png",
+  "./assets/playback-icon-192.png",
+  "./assets/playback-icon-512.png",
+  "./assets/playback-icon-maskable-512.png",
 ];
 const shell = new Set(
   FILES.map((path) => new URL(path, self.registration.scope).href),

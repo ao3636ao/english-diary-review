@@ -6,7 +6,7 @@
       name="viewport"
       content="width=device-width, initial-scale=1, viewport-fit=cover"
     />
-    <meta name="theme-color" content="#193f36" />
+    <meta name="theme-color" content="#087ee5" />
     <meta
       name="description"
       content="英語日記と日常のフレーズを、日本語から声に出して復習。データはあなたの端末内に保存します。"
@@ -15,9 +15,14 @@
       http-equiv="Content-Security-Policy"
       content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'"
     />
-    <title>ことばのノート — 英語日記・フレーズ復習</title>
-    <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
-    <link rel="apple-touch-icon" href="./icons/icon-192.png" />
+    <title>PLAY BACK — 英語日記・フレーズ復習</title>
+    <link
+      rel="icon"
+      href="./assets/playback-icon-96.png"
+      type="image/png"
+      sizes="96x96"
+    />
+    <link rel="apple-touch-icon" href="./assets/playback-icon-192.png" />
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="stylesheet" href="./styles.css" />
     <script type="module" src="./src/app.js"></script>
@@ -25,20 +30,27 @@
   <body>
     <a class="skip-link" href="#main">本文へ移動</a>
     <header class="app-header">
-      <a class="brand" href="#home" aria-label="ことばのノート ホーム"
-        ><img src="./icons/icon.svg" alt="" width="36" height="36" /><span
-          >ことばのノート<small>英語日記・フレーズ復習</small></span
-        ></a
-      >
-      <div class="header-actions">
-        <span id="connection" class="connection">端末内に保存</span
-        ><button
-          type="button"
-          class="button small secondary"
-          data-action="backup"
-        >
-          バックアップ
-        </button>
+      <div class="header-inner">
+        <a class="brand" href="#home" aria-label="PLAY BACK ホーム">
+          <img
+            class="brand-wordmark"
+            src="./assets/playback-wordmark.png"
+            alt="PLAY BACK"
+            width="1086"
+            height="699"
+          />
+        </a>
+        <span class="app-description">英語日記・フレーズ復習</span>
+        <div class="header-actions">
+          <span id="connection" class="connection">端末内に保存</span
+          ><button
+            type="button"
+            class="button small secondary"
+            data-action="backup"
+          >
+            バックアップ
+          </button>
+        </div>
       </div>
     </header>
     <div id="backup-status" class="backup-status" aria-live="polite"></div>
@@ -52,24 +64,42 @@
       </button>
     </div>
     <main id="main" tabindex="-1">
-      <p class="loading">ノートを開いています…</p>
+      <p class="loading">データを読み込んでいます…</p>
     </main>
     <nav class="bottom-nav" aria-label="メインメニュー">
       <a href="#home" data-view="home"
-        ><span aria-hidden="true">⌂</span>ホーム</a
+        ><svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="m3 10 9-7 9 7v10H3zM9 20v-7h6v7" /></svg
+        >ホーム</a
       >
       <a href="#study" data-view="study"
-        ><span aria-hidden="true">▻</span>復習</a
+        ><svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="m8 4 12 8-12 8zM3 4v16" /></svg
+        >復習</a
       >
       <a href="#library" data-view="library"
-        ><span aria-hidden="true">▤</span>一覧</a
+        ><svg viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="4" y="3" width="16" height="18" rx="1" />
+          <path d="M8 8h8M8 12h8M8 16h5" /></svg
+        >一覧</a
       >
-      <a href="#add" data-view="add"><span aria-hidden="true">＋</span>追加</a>
+      <a href="#add" data-view="add"
+        ><svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 3v18M3 12h18" /></svg
+        >追加</a
+      >
       <a href="#stats" data-view="stats"
-        ><span aria-hidden="true">▥</span>記録</a
+        ><svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M4 3v18h17M8 16v-4M13 16V8M18 16V4" /></svg
+        >記録</a
       >
       <a href="#settings" data-view="settings"
-        ><span aria-hidden="true">⚙</span>設定</a
+        ><svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M4 6h16M4 12h16M4 18h16" />
+          <circle cx="9" cy="6" r="2" />
+          <circle cx="16" cy="12" r="2" />
+          <circle cx="8" cy="18" r="2" /></svg
+        >設定</a
       >
     </nav>
     <div

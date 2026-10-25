@@ -78,37 +78,26 @@ export function home(state) {
   const recent = state.progress
     .filter((p) => p.last_reviewed_at)
     .sort((a, b) => b.last_reviewed_at.localeCompare(a.last_reviewed_at))
-    .slice(0, 5);
+    .slice(0, 4);
   const today = state.progress.filter(
     (p) =>
       p.last_reviewed_at && jstDate(new Date(p.last_reviewed_at)) === jstDate(),
   ).length;
-  return `<section class="hero"><div><p class="eyebrow">YOUR DAILY ENGLISH NOTE</p><h1>今日のことばを、<br>明日の自分へ。</h1><p>日本語を見て、英語でひとこと。<br>小さな復習を、毎日の習慣に。</p><button class="button light" data-action="start-study">今日の学習をはじめる <span aria-hidden="true">→</span></button><small>${today ? `今日は${today}件の表現を復習しました` : "1文から、自分のペースで。"}</small></div><div class="hero-art" aria-hidden="true"><span class="art-line">ことば</span><span class="art-english">a little,<br>every day.</span><span class="art-rule"></span><span class="art-dot"></span></div></section>
-    ${state.records.some(isDiary) ? '<div class="diary-shortcut"><button class="button secondary" data-action="start-diary-study">日記セットを復習 <span aria-hidden="true">→</span></button><p class="fine">ひとつの日記を、文の順番どおりに。</p></div>' : ""}
-    <section class="metrics" aria-label="学習の概要">${metric(s.total, "ノートの表現")}${metric(s.studied, "学習済み")}${metric(s.weak, "苦手な表現")}</section>
-    ${
-      !s.total
-        ? empty(
-            "はじめの表現を、ノートへ。",
-            "diary_pairs.jsonの読み込み、ChatGPTのJSON貼り付け、手入力から追加できます。",
-            '<a class="button" href="#add">初期データを読み込む</a><p class="fine">日記データはこの端末の中だけに保存します。</p>',
-          )
-        : `<div class="two-columns"><section class="panel"><div class="section-title"><h2>最近の復習</h2><a href="#stats">すべての記録 →</a></div>${
-            recent.length
-              ? `<ul class="recent-list">${recent
-                  .map((p) => {
-                    const r = state.records.find(
-                      (r) => r.sentence_id === p.sentence_id,
-                    );
-                    return r
-                      ? `<li><div><p>${escape(r.study_japanese)}</p><small>${escape(displayTime(p.last_reviewed_at))}</small></div><span class="badge ${p.last_result === "again" ? "amber" : ""}">${p.last_result === "again" ? "もう一度" : "覚えた"}</span></li>`
-                      : "";
-                  })
-                  .join("")}</ul>`
-              : '<p class="muted">最初の復習をはじめてみましょう。記録はここに残ります。</p>'
-          }</section><section class="panel soft"><p class="eyebrow">KEEP YOUR WORDS</p><h2>学んだことを、すぐに追加。</h2><p>ChatGPTで作った英文をJSONで貼り付けるだけ。日記も、仕事のひとことも。</p><a class="button secondary" href="#add">新しい表現を追加</a><p class="fine">追加したら、バックアップも忘れずに。</p></section></div>`
-    }
-    <p class="privacy-note">端末内に保存 · ログイン不要 · 広告・アクセス解析なし</p>`;
+  return `<section class="home-overview" aria-label="ホーム"><figure class="hero"><img class="hero-image" src="./assets/hero-grassland.webp" alt="青空と草原の中に立つ少年とバイク" width="1448" height="1086" fetchpriority="high"></figure><div class="home-controls"><div class="section-title home-title"><h1>復習</h1><span class="today-count">今日 ${today}文</span></div><div class="primary-actions"><button class="button review-action sentence-action" data-action="start-sentence-study" aria-label="1文ずつ復習"><span>1文ずつ復習</span><span aria-hidden="true">→</span></button><button class="button review-action diary-action" data-action="start-diary-study" aria-label="日記セットを復習"><span>日記セットを復習</span><span aria-hidden="true">→</span></button></div><section class="metrics home-metrics" aria-label="学習の概要">${metric(s.total, "登録文数")}${metric(s.studied, "学習済み")}${metric(s.readAloud, "音読回数")}</section><dl class="home-counts"><div><dt>未学習</dt><dd>${s.unseen}文</dd></div><div><dt>苦手な問題</dt><dd>${s.weak}文</dd></div></dl></div></section>
+    <div class="home-details two-columns"><section class="panel"><div class="section-title"><h2>最近の学習</h2><a href="#stats">学習記録 →</a></div>${
+      recent.length
+        ? `<ul class="recent-list">${recent
+            .map((p) => {
+              const r = state.records.find(
+                (r) => r.sentence_id === p.sentence_id,
+              );
+              return r
+                ? `<li><div><p>${escape(r.study_japanese)}</p><small>${escape(displayTime(p.last_reviewed_at))}</small></div><span class="badge ${p.last_result === "again" ? "amber" : ""}">${p.last_result === "again" ? "もう一度" : "覚えた"}</span></li>`
+                : "";
+            })
+            .join("")}</ul>`
+        : '<p class="muted">学習記録はまだありません。</p>'
+    }</section><section class="panel soft home-data"><h2>${s.total ? "追加・バックアップ" : "学習データを追加"}</h2><p>${s.total ? "JSON・手入力での追加と、全データのバックアップ。" : "初期データのJSONファイル、ChatGPTのJSON、手入力から登録できます。"}</p><div class="actions"><a class="button secondary" href="#add">${s.total ? "表現を追加" : "JSONを読み込む"}</a><button class="button secondary" data-action="backup">バックアップ</button></div></section></div><p class="privacy-note">データは端末内に保存 · ログイン不要 · 広告なし</p>`;
 }
 
 function readCounter(r, p, inputId = "read-count") {
@@ -209,7 +198,7 @@ export function study(state, ui) {
   const session = ui.session;
   if (!session)
     content = empty(
-      "声に出して、思い出す。",
+      "出題設定を選択",
       "日本語を見たら英語を考えて、答えを確認。最後に自分で採点します。",
       "",
     );
@@ -241,7 +230,7 @@ export function study(state, ui) {
     heading(
       "PRACTICE",
       "復習する",
-      "日記はひとつの話として、フレーズはひとつずつ。",
+      "日本語から英文を思い出し、答えを確認して自己採点します。",
     ) +
     config +
     content
@@ -251,9 +240,9 @@ export function study(state, ui) {
 export function library(state, ui) {
   return (
     heading(
-      "YOUR COLLECTION",
+      "LIBRARY",
       "日記・フレーズ一覧",
-      "日記も、日常のひとことも。ここにすべて。",
+      "登録した日記・フレーズを検索、編集できます。",
     ) +
     `<section class="panel"><div class="library-toolbar"><label class="search-label">検索<input id="list-search" type="search" placeholder="日本語・英語・タグで検索" value="${escape(ui.list.query)}"></label><label>カテゴリ<select id="list-category">${categoryOptions(state, ui.list.category)}</select></label><label>表示単位<select id="list-group">${options(
       [
@@ -295,7 +284,7 @@ export function libraryResults(state, ui) {
     return empty(
       state.records.length
         ? "条件に合う表現がありません"
-        : "ノートはまだ空です",
+        : "登録データはありません",
       state.records.length
         ? "検索語やカテゴリを変えてみてください。"
         : "最初の日記やフレーズを追加しましょう。",
@@ -355,23 +344,23 @@ function importPreview(plan) {
   const others = plan.filter((p) => p.action !== "update");
   const visible = [...changes, ...others.slice(0, 200)];
   const count = (action) => plan.filter((p) => p.action === action).length;
-  return `<section class="panel import-preview" id="import-preview" tabindex="-1"><p class="eyebrow">IMPORT PREVIEW</p><h2>追加する前に、確認。</h2><div class="metrics">${metric(count("new"), "新規追加")}${metric(count("duplicate"), "重複・追加しない")}${metric(count("update"), "更新候補")}</div>${count("update") ? '<p class="warning-text">更新は、下の候補にチェックしたものだけ行います。学習履歴は維持します。</p>' : ""}<div class="preview-items">${visible.map((p) => `<div class="preview-item">${p.action === "update" ? `<label class="update-choice"><input type="checkbox" name="update-record" value="${escape(p.record.sentence_id)}">この内容に更新する</label>` : `<span class="badge ${p.action === "duplicate" ? "pale" : ""}">${p.action === "new" ? "新規追加" : "重複"}</span>`}<p>${escape(p.record.study_japanese)}</p><p lang="en">${escape(p.record.english)}</p><small>${escape(p.record.date_jst)} · ${escape(categoryName(p.record.category))}</small>${p.action === "update" ? `<details><summary>現在の内容と変更後を比較</summary><h3>現在</h3><pre>${escape(JSON.stringify(p.before, null, 2))}</pre><h3>変更後</h3><pre>${escape(JSON.stringify(p.record, null, 2))}</pre></details>` : ""}</div>`).join("")}${others.length > 200 ? `<p class="fine">更新候補はすべて、新規・重複は先頭200件を表示しています。表示外の新規・重複${others.length - 200}件も集計どおりに処理します。</p>` : ""}</div><button class="button" data-action="commit-import">追加してバックアップ</button><p class="fine">保存後、全データのJSONをダウンロードします。既存の学習履歴は維持します。</p></section>`;
+  return `<section class="panel import-preview" id="import-preview" tabindex="-1"><p class="eyebrow">IMPORT PREVIEW</p><h2>登録内容の確認</h2><div class="metrics">${metric(count("new"), "新規追加")}${metric(count("duplicate"), "重複・追加しない")}${metric(count("update"), "更新候補")}</div>${count("update") ? '<p class="warning-text">更新は、下の候補にチェックしたものだけ行います。学習履歴は維持します。</p>' : ""}<div class="preview-items">${visible.map((p) => `<div class="preview-item">${p.action === "update" ? `<label class="update-choice"><input type="checkbox" name="update-record" value="${escape(p.record.sentence_id)}">この内容に更新する</label>` : `<span class="badge ${p.action === "duplicate" ? "pale" : ""}">${p.action === "new" ? "新規追加" : "重複"}</span>`}<p>${escape(p.record.study_japanese)}</p><p lang="en">${escape(p.record.english)}</p><small>${escape(p.record.date_jst)} · ${escape(categoryName(p.record.category))}</small>${p.action === "update" ? `<details><summary>現在の内容と変更後を比較</summary><h3>現在</h3><pre>${escape(JSON.stringify(p.before, null, 2))}</pre><h3>変更後</h3><pre>${escape(JSON.stringify(p.record, null, 2))}</pre></details>` : ""}</div>`).join("")}${others.length > 200 ? `<p class="fine">更新候補はすべて、新規・重複は先頭200件を表示しています。表示外の新規・重複${others.length - 200}件も集計どおりに処理します。</p>` : ""}</div><button class="button" data-action="commit-import">追加してバックアップ</button><p class="fine">保存後、全データのJSONをダウンロードします。既存の学習履歴は維持します。</p></section>`;
 }
 
 export function add(state, ui) {
   if (ui.editId)
     return (
       heading(
-        "EDIT YOUR NOTE",
+        "EDIT",
         "表現を編集",
         "変更しても、この表現の学習履歴は維持します。",
       ) + `<section class="panel">${manualForm(state, ui)}</section>`
     );
   return (
     heading(
-      "ADD TO YOUR NOTE",
+      "ADD",
       "新しい表現を追加",
-      "日記も、フレーズも。学んだその日のうちに。",
+      "JSONファイル・貼り付け・手入力で登録できます。",
     ) +
     `<div class="tabs" role="group" aria-label="追加方法"><button class="${ui.addMode === "json" ? "active" : ""}" data-action="add-json">JSON・ファイル</button><button class="${ui.addMode === "manual" ? "active" : ""}" data-action="add-manual">手入力</button></div><section class="panel">${ui.addMode === "manual" ? manualForm(state, ui) : `<form id="import-form"><label class="file-picker">JSONファイルを選ぶ<input id="import-file" type="file" accept=".json,application/json,text/plain"><span class="fine">初期の diary_pairs.json もこちらから（10MBまで）</span></label><div class="divider"><span>または、ChatGPTから貼り付け</span></div><label>追加用JSON<textarea id="import-json" rows="10" spellcheck="false" placeholder='[{"study_japanese": "架空の日本語", "english": "A fictional sentence.", "category": "daily"}]'>${escape(ui.importInput)}</textarea></label><button type="submit" class="button">追加内容を確認</button><details class="help"><summary>ChatGPTには、どう頼む？</summary><p>「アプリ追加用JSONで出して。study_japanese、english、date_jst、entry_type、category、katakana、explanation、alternative_englishを含めて」と依頼します。</p><p>1件のオブジェクト・複数件の配列に対応。IDは省略できます。発音表記はアプリでは生成しません。</p></details></form>`}</section>${ui.importPlan ? importPreview(ui.importPlan) : ""}`
   );
@@ -381,11 +370,7 @@ export function stats(state) {
   const s = summarize(state.records, state.progress);
   const weak = state.records.filter((r) => isWeak(pFor(state, r.sentence_id)));
   return (
-    heading(
-      "YOUR PROGRESS",
-      "学習の記録",
-      "少しずつの積み重ねを、目に見えるかたちに。",
-    ) +
+    heading("PROGRESS", "学習の記録", "自己採点と音読回数を集計します。") +
     `<section class="metrics six">${metric(s.total, "総問題数")}${metric(s.studied, "学習済み")}${metric(s.unseen, "未学習")}${metric(s.accuracy === null ? "—" : `${s.accuracy}%`, "累計正解率（自己採点）")}${metric(s.weak, "苦手な問題")}${metric(s.readAloud, "累計音読回数")}</section><section class="panel"><h2>カテゴリ別の学習状況</h2><div class="table-scroll"><table><thead><tr><th scope="col">カテゴリ</th><th scope="col">問題数</th><th scope="col">学習済み</th><th scope="col">正解率</th><th scope="col">音読</th></tr></thead><tbody>${categories(
       state,
     )
@@ -433,12 +418,12 @@ export function settings(state, ui) {
     rates.push([state.settings.speechRate, `${state.settings.speechRate}倍`]);
   return (
     heading(
-      "SETTINGS & BACKUP",
+      "SETTINGS",
       "設定・バックアップ",
-      "大切なノートを、端末の外にも残しておきましょう。",
+      "データのバックアップ・復元と学習設定。",
     ) +
-    `<section class="panel"><div class="section-title"><h2>ノートをバックアップ</h2><span class="badge ${dirty ? "amber" : ""}">${dirty ? "未バックアップの更新あり" : "更新なし"}</span></div><p>全${state.records.length}件の表現・学習履歴・音読回数・設定を、1つのJSONにまとめます。</p><dl class="info-list"><div><dt>最終バックアップ作成</dt><dd>${escape(displayTime(state.last_backup?.created_at))}</dd></div><div><dt>データ最終更新</dt><dd>${escape(displayTime(state.updated_at))}</dd></div></dl><button class="button" data-action="backup">全データをバックアップ</button>${ui.lastDownload ? '<button class="button secondary" data-action="retry-download">直前のバックアップを再ダウンロード</button>' : ""}<p class="warning-text">バックアップには日記などの個人情報が含まれます。安全な場所に保存してください。</p><p class="fine">ブラウザから端末への保存完了は確認できません。ダウンロード一覧でファイルの保存を確認してください。</p></section>
-  <section class="panel"><h2>バックアップから復元</h2><p class="muted">機種変更のときも、ノートと学習の続きから。</p><form id="restore-form"><label class="file-picker">バックアップJSONを選ぶ<input id="restore-file" type="file" accept=".json,application/json,text/plain"><span class="fine">10MBまで · 初期データの配列は「追加」画面へ</span></label><details${ui.restoreInput ? " open" : ""}><summary>JSONテキストから復元する</summary><label>バックアップJSON<textarea id="restore-json" rows="6" spellcheck="false">${escape(ui.restoreInput)}</textarea></label></details><button type="submit" class="button secondary">復元内容を確認</button></form>${
+    `<section class="panel"><div class="section-title"><h2>データをバックアップ</h2><span class="badge ${dirty ? "amber" : ""}">${dirty ? "未バックアップの更新あり" : "更新なし"}</span></div><p>全${state.records.length}件の表現・学習履歴・音読回数・設定を、1つのJSONにまとめます。</p><dl class="info-list"><div><dt>最終バックアップ作成</dt><dd>${escape(displayTime(state.last_backup?.created_at))}</dd></div><div><dt>データ最終更新</dt><dd>${escape(displayTime(state.updated_at))}</dd></div></dl><button class="button" data-action="backup">全データをバックアップ</button>${ui.lastDownload ? '<button class="button secondary" data-action="retry-download">直前のバックアップを再ダウンロード</button>' : ""}<p class="warning-text">バックアップには日記などの個人情報が含まれます。安全な場所に保存してください。</p><p class="fine">ブラウザから端末への保存完了は確認できません。ダウンロード一覧でファイルの保存を確認してください。</p></section>
+  <section class="panel"><h2>バックアップから復元</h2><p class="muted">日記・フレーズ・学習履歴・設定をJSONから復元します。</p><form id="restore-form"><label class="file-picker">バックアップJSONを選ぶ<input id="restore-file" type="file" accept=".json,application/json,text/plain"><span class="fine">10MBまで · 初期データの配列は「追加」画面へ</span></label><details${ui.restoreInput ? " open" : ""}><summary>JSONテキストから復元する</summary><label>バックアップJSON<textarea id="restore-json" rows="6" spellcheck="false">${escape(ui.restoreInput)}</textarea></label></details><button type="submit" class="button secondary">復元内容を確認</button></form>${
     b
       ? `<div id="restore-preview" class="restore-preview" tabindex="-1"><h3>復元前の確認</h3><p>${b.records.length}件の表現、${b.progress.length}件の学習履歴</p><p class="fine">作成：${escape(displayTime(b.created_at))} · 内容の競合 ${conflicts.length}件</p>${
           conflicts.length
@@ -457,7 +442,7 @@ export function settings(state, ui) {
     rates.sort((a, b) => a[0] - b[0]),
     state.settings.speechRate,
   )}</select></label><p class="fine">端末内の英語音声だけを使います。利用できない場合はChrome・端末の音声設定を確認してください。カタカナ表記とは独立した機能です。</p><hr><h3>端末の保存領域</h3><p id="storage-info" class="muted">${escape(ui.storageInfo ?? "保存領域の状態を確認中…")}</p><button class="button secondary" data-action="persist-storage">永続ストレージを要求</button><p class="fine">許可されても、ブラウザのデータ削除や端末の故障は防げません。シークレットモードでの利用は避け、必ずバックアップしてください。</p></section>
-  <section class="panel soft"><h2>ホーム画面に追加</h2><p>Android Chromeのメニューから「ホーム画面に追加」または「アプリをインストール」を選べます。</p>${ui.installPrompt ? '<button class="button secondary" data-action="install-app">ホーム画面に追加する</button>' : ""}<p class="fine">初回の読み込み後はオフラインでも利用できます。データはブラウザ・端末ごとに保存され、自動同期はしません。音声は端末内の対応音声が必要です。</p><p class="fine">アプリ v1.1.0 · 表示日時は日本時間（JST）</p></section>`
+  <section class="panel soft"><h2>ホーム画面に追加</h2><p>Android Chromeのメニューから「ホーム画面に追加」または「アプリをインストール」を選べます。</p>${ui.installPrompt ? '<button class="button secondary" data-action="install-app">ホーム画面に追加する</button>' : ""}<p class="fine">初回の読み込み後はオフラインでも利用できます。データはブラウザ・端末ごとに保存され、自動同期はしません。音声は端末内の対応音声が必要です。</p><p class="fine">PLAY BACK v1.2.0 · 表示日時は日本時間（JST）</p></section>`
   );
 }
 

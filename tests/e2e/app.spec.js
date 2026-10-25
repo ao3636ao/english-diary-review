@@ -460,7 +460,7 @@ test("GitHub Pagesのサブパスで起動し、オフライン再読み込み�
   await context.setOffline(true);
   await page.goto("http://127.0.0.1:4173/english-diary-review/");
   await expect(
-    page.getByRole("heading", { name: /今日のことばを、\s*明日の自分へ。/ }),
+    page.getByRole("heading", { name: "復習", exact: true }),
   ).toBeVisible();
   expect((await db(page)).records).toHaveLength(1);
   await revealOne(page);
