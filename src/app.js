@@ -87,7 +87,7 @@ function renderShell() {
   const status = document.querySelector("#backup-status");
   status.classList.toggle("dirty", dirty);
   status.innerHTML = dirty
-    ? '<button type="button" data-action="backup">未バックアップの更新があります。ノートをバックアップ →</button>'
+    ? '<button type="button" data-action="backup">未バックアップの更新があります。バックアップ →</button>'
     : state.last_backup
       ? `最終バックアップ作成：${escape(displayTime(state.last_backup.created_at))}（端末への保存を確認してください）`
       : "データはこの端末のブラウザ内に保存されます。";
@@ -411,6 +411,15 @@ const actions = {
     startSession(
       selectReviewItems(state.records, state.progress, state.settings.filters),
     ),
+  "start-sentence-study": async () => {
+    const filters = { ...DEFAULT_FILTERS, unit: "sentence" };
+    await save({
+      ...state,
+      settings: validateSettings({ ...state.settings, filters }),
+    });
+    ui.mode = "custom";
+    startSession(selectReviewItems(state.records, state.progress, filters));
+  },
   "start-diary-study": async () => {
     const filters = { ...DEFAULT_FILTERS, unit: "diary-set" };
     await save({

@@ -1,16 +1,32 @@
 {
   "id": "./",
-  "name": "ことばのノート — 英語日記・フレーズ復習",
-  "short_name": "ことばのノート",
+  "name": "PLAY BACK",
+  "short_name": "PLAY BACK",
   "lang": "ja",
   "description": "英語日記とフレーズを、端末内だけで保存・復習。",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#f8f9f5",
-  "theme_color": "#193f36",
+  "background_color": "#ffffff",
+  "theme_color": "#087ee5",
   "icons": [
-    { "src": "./icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "./icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+    {
+      "src": "./assets/playback-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./assets/playback-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./assets/playback-icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
   ]
 }

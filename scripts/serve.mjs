@@ -19,6 +19,7 @@ const types = {
   ".webmanifest": "application/manifest+json",
   ".svg": "image/svg+xml",
   ".png": "image/png",
+  ".webp": "image/webp",
 };
 const publicFiles = new Set([
   "index.html",
@@ -29,9 +30,12 @@ const publicFiles = new Set([
   "src/core.js",
   "src/db.js",
   "src/views.js",
-  "icons/icon.svg",
-  "icons/icon-192.png",
-  "icons/icon-512.png",
+  "assets/playback-wordmark.png",
+  "assets/hero-grassland.webp",
+  "assets/playback-icon-96.png",
+  "assets/playback-icon-192.png",
+  "assets/playback-icon-512.png",
+  "assets/playback-icon-maskable-512.png",
 ]);
 const server = http.createServer(async (request, response) => {
   try {
